@@ -47,7 +47,6 @@ public:
     unsigned int getActivationTimestep()const{return activationTimestep;}
     bool         isActive()const{return active;}
     bool         isBoundary()const{return boundary;}
-    bool         isInitiallyActive()const{return initiallyActive;}
     int          getPatchID()const{return patchID;}
 
 protected:
@@ -59,7 +58,6 @@ protected:
 private:
 
     bool active          = false;
-    bool initiallyActive = false;
     bool boundary        = false;
     unsigned int patchPos; // the position of the unit within a patch
     unsigned int pos;   // index of the unit

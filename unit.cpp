@@ -53,10 +53,6 @@ void Unit::activate(unsigned int ts){
 
     active = true;
     activationTimestep = ts;
-
-    if (ts==0){
-        initiallyActive = true;
-    }
 }
 
 
