@@ -1,7 +1,6 @@
 # OpenHDM
-### An Open-Source Software Framework for Hydrodynamic Models
 
-OpenHDM is designed to facilitate adaptive grid behavior and to utilize concurrent and hierarchical executions of multiple domain instances by means of dynamic containers and object-oriented design principles.
+OpenHDM, an open-source software framework for hydrodynamic models, is designed to facilitate adaptive grid behavior and to utilize concurrent and hierarchical executions of multiple domain instances by means of dynamic containers and object-oriented design principles.
 
 ### Models developed with OpenHDM:
 
