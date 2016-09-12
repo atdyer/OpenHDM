@@ -11,13 +11,13 @@ A simple finite-volume shallow water equations solver, called ASMFV, and the rei
 
 ### Class Diagram of OpenHDM:
 
-The framework consists of class templates and abstract classes that can accommodate hydrodynamic models based on different numerical methods and formulations .
+The framework consists of class templates and abstract classes that can accommodate hydrodynamic models based on different numerical methods and formulations. (Go to [OpenHDM Wiki](https://github.com/alperaltuntas/OpenHDM/wiki) for brief explanations of OpenHDM classes.)
 
 ![Class Diagram](doc/img/classDiagram.png  "Class Diagram")
 
 ### Grid-Patch Pair:
 
-Discrete model data in OpenHDM is maintained by a Grid-Patch pair, where the former is the container of the actual data e.g., nodes elements, etc., that is resized relatively less frequently in runtime, and the latter is a virtual view of a subset of the data, providing a level of indirection and allowing the designation of the active regions of the grid in a highly dynamic manner.
+Discrete model data in OpenHDM is maintained by a Grid-Patch pair, where the former is the container of the actual data e.g., nodes elements, etc., that is resized relatively less frequently in runtime, and the latter is a virtual view of a subset of the data, providing a level of indirection and allowing the designation of the active regions of the grid in a highly dynamic manner. The following image shows a dynamic patch with boundaries that are adaptively determined during runtime.
 
 ![GridPatch](doc/img/gridPatch.png  "Grid-Patch Pair")
 
@@ -27,5 +27,8 @@ The concurrent execution of domains which may be defined in a hierarchy is synch
 
 ![GridPatch](doc/img/phasing.png  "Grid-Patch Pair")
 
+### Working with OpenHDM:
+
+Further instructions of how to use OpenHDM for developing new models will soon be added to [OpenHDM Wiki](https://github.com/alperaltuntas/OpenHDM/wiki). 
 
 
