@@ -17,12 +17,17 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenHDM.  If not, see <http://www.gnu.org/licenses/>.
 
-
 #include <sstream>
 #include <iterator>
-
 #include "report.h"
 #include "projectinput.h"
+
+using namespace OpenHDM;
+
+// --------------------------------------------------------------------
+// This source file includes the function implementations of the
+// "ProjectInput" class defined in projectinput.h
+// --------------------------------------------------------------------
 
 ProjectInput::ProjectInput(std::string projectFilePath):
     Input("",projectFilePath)
@@ -33,12 +38,6 @@ ProjectInput::ProjectInput(std::string projectFilePath):
 
     readInputFile();
 }
-
-ProjectInput::~ProjectInput()
-{
-
-}
-
 
 void ProjectInput::readInputFile(){
 

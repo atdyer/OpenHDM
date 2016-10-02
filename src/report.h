@@ -17,13 +17,19 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenHDM.  If not, see <http://www.gnu.org/licenses/>.
 
-
 #ifndef REPORT_H
 #define REPORT_H
 
 #include <iostream>
 #include <string>
 #include <algorithm>
+
+namespace OpenHDM {
+
+// --------------------------------------------------------------------
+// Report: An auxiliary concrete class aimed to be used for reporting
+//   errors, warnings, and logs.
+// --------------------------------------------------------------------
 
 class Report
 {
@@ -65,6 +71,11 @@ void Report::printv(VarType varLast){
     std::cout << varLast << std::endl;
 }
 
+} // end of namespace OpenHDM
 
+
+// Let other files use OpenHDM::Report functions without having to
+// specify OpenHDM namespace explicitly:
+using OpenHDM::Report;
 
 #endif // REPORT_H

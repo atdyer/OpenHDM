@@ -17,7 +17,6 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenHDM.  If not, see <http://www.gnu.org/licenses/>.
 
-
 #ifndef INPUT_H
 #define INPUT_H
 
@@ -27,6 +26,12 @@
 #include <fstream>
 #include <vector>
 
+namespace OpenHDM {
+
+// --------------------------------------------------------------------
+// Input: The concrete "Input" class is aimed to be used as a base
+//   class for derived classes encapsulating model input files.
+// --------------------------------------------------------------------
 
 class Input
 {
@@ -107,5 +112,7 @@ void Input::readParams(std::stringstream &sline, ParamType &param){
     // Set the last parameter and end recursion
     sline >> param;
 }
+
+} // end of namespace OpenHDM
 
 #endif // INPUT_H

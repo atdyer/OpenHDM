@@ -17,7 +17,6 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenHDM.  If not, see <http://www.gnu.org/licenses/>.
 
-
 #ifndef PROJECT_H
 #define PROJECT_H
 
@@ -28,18 +27,21 @@
 #include <algorithm>
 #include <memory>
 #include <sstream>
-
 #include "threading.h"
 #include "projectinput.h"
 #include "report.h"
 
-/*
- *  "Project" class template is responsible for managing the domains of the project to
- *  be simulated. The tasks of the Project class includes instantiating domains,
- *  constructing domain hierarchy, performing the timestepping process, and regulating
- *  input/output procedures of the simulation. Constructor of the Project class template
- *  requires a projectInput object as an argument to instantiate the project.
- */
+namespace OpenHDM {
+
+// --------------------------------------------------------------------
+// Project: The class template Project is the main driver of concurrent
+//   simulations. It can own multiple domain instances that can be
+//   simulated concurrently. The implementation of this class template
+//   is complete and requires no user modification or derivation. For
+//   each concurrent execution, a single Project instance is created,
+//   which is responsible for coordinating the domains and the
+//   timestepping routine.
+// --------------------------------------------------------------------
 
 template <class domainClass>
 class Project
@@ -116,13 +118,11 @@ Project<domainClass>::Project(ProjectInput &projectInput):
 
 }
 
-
 template <class domainClass>
 Project<domainClass>::~Project()
 {
 
 }
-
 
 // Performs the serial|parallel simulation of all domains in the project.
 template <class domainClass>
@@ -511,6 +511,6 @@ bool Project<domainClass>::outputDir_isAvailable(std::string newOutputDir){
     return true;
 }
 
-
+} // end of namespace OpenHDM
 
 #endif // PROJECT_H

@@ -17,7 +17,6 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenHDM.  If not, see <http://www.gnu.org/licenses/>.
 
-
 #ifndef DOMAIN_H
 #define DOMAIN_H
 
@@ -27,24 +26,30 @@
 #include <list>
 #include <string>
 #include <sstream>
-
 #include "threading.h"
 #include "report.h"
 
+namespace OpenHDM {
 
-/*  Domain: an abstract class template that can be used as a base class for derived
- *  domain types.
- *
- *  Each domain object instance has a solver, a set of inputs and outputs.
- *  Note that each solver has its own grid instance, i.e., each domain has exactly one
- *  grid instance. A derived domain class must provide implementations for pure
- *  virtual classes of this abstract class template.
- */
+template <class SolverType> class Project; // forward declaration
+
+// --------------------------------------------------------------------
+// Domain: The abstract class template "Domain" is aimed to be used as
+//   a base class for derived domain classes. Each Domain object
+//   encapsulates an individual model domain instance that has a
+//   distinct set of inputs a computational grid, and outputs. The
+//   abstract class template leaves the implementation of tasks that
+//   fully depend on the model details, such as reading input files and
+//   lazy initialization of derived-type members, to the developer of
+//   the derived model through pure virtual functions. General tasks
+//   regarding domain hierarchy, phasing, and mutithreading are
+//   implemented in this abstract template.
+// --------------------------------------------------------------------
 
 template <class SolverType>
 class Domain: public std::enable_shared_from_this<Domain<SolverType>>
 {
-    template <class domainType> friend class Project;
+    template <class domainType> friend class OpenHDM::Project;
 
 public:
 
@@ -71,7 +76,6 @@ public:
     short get_nPhases();
     virtual unsigned int    get_nts()const=0;
     const std::shared_ptr<SolverType>& getSolver()const;
-
 
 protected:
 
@@ -103,7 +107,6 @@ protected:
     // multithreading:
     void phaseCheck();
     void completePhase();
-
 
 private:
 
@@ -141,7 +144,7 @@ Domain<SolverType>::Domain(std::string  id_,
 template <class SolverType>
 Domain<SolverType>::~Domain()
 {
-    Report::log("Destructing Domain: "+id,1);
+    Report::log("Domain "+id+" run has been completed.",1);
 }
 
 // Finalizes the domain initialization. Called before timestepping begins.
@@ -346,6 +349,6 @@ std::shared_ptr<Domain<SolverType>> Domain<SolverType>::getChild(unsigned int i)
     return childDomain_i;
 }
 
-
+} // end of namespace OpenHDM
 
 #endif // DOMAIN_H

@@ -17,7 +17,6 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenHDM.  If not, see <http://www.gnu.org/licenses/>.
 
-
 #ifndef THREADING_H
 #define THREADING_H
 
@@ -26,14 +25,20 @@
 #include <shared_mutex>
 #include <condition_variable>
 
+namespace OpenHDM {
+
 // forward declare Domain template outside the scope of Threading namespace
 template <class SolverType> class Domain;
 
-
 namespace Threading {
 
+// --------------------------------------------------------------------
+// ControlPoint: Used to mark the control point at which a domain is
+//   within a phase of a timestep.
+// --------------------------------------------------------------------
+
 struct ControlPoint{
-    template <class SolverType> friend class ::Domain;
+    template <class SolverType> friend class OpenHDM::Domain;
 
     ControlPoint();
 
@@ -50,6 +55,10 @@ private:
     mutable std::shared_timed_mutex mtx;    // mutex for "val" and "done"
 };
 
+// --------------------------------------------------------------------
+// Pool: A very simple thread pool implementation for allocating
+//   the processors among concurrent domains.
+// --------------------------------------------------------------------
 
 struct Pool{
     Pool(unsigned int nProcs_);
@@ -65,7 +74,7 @@ private:
 
 };
 
-
-}
+} // end of namespace Threading
+} // end of namespace OpenHDM
 
 #endif // THREADING_H

@@ -17,8 +17,12 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenHDM.  If not, see <http://www.gnu.org/licenses/>.
 
-
 #include "report.h"
+
+// --------------------------------------------------------------------
+// This source file includes auxiliary static functions for reporting
+// errors, warnings, and logs.
+// --------------------------------------------------------------------
 
 __attribute__((noreturn))
 void Report::error(std::string source, std::string dscrpt){

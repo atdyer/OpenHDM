@@ -17,8 +17,15 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenHDM.  If not, see <http://www.gnu.org/licenses/>.
 
-
 #include "threading.h"
+
+using namespace OpenHDM;
+
+// --------------------------------------------------------------------
+// This source file includes implementations for multithreading in
+// OpenHDM. The classes "ControlPoint" and "Pool" are defined in
+// threading.h.
+// --------------------------------------------------------------------
 
 Threading::ControlPoint::ControlPoint()
 {

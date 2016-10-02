@@ -17,12 +17,17 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenHDM.  If not, see <http://www.gnu.org/licenses/>.
 
-
 #include <sys/types.h>
 #include <sys/stat.h>
-
 #include "report.h"
 #include "output.h"
+
+using namespace OpenHDM;
+
+// --------------------------------------------------------------------
+// This source file includes some of the function implementations of
+// the "Output" class defined in output.h
+// --------------------------------------------------------------------
 
 Output::Output(bool isChild_):
     fileDir(""),

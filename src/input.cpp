@@ -17,14 +17,18 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenHDM.  If not, see <http://www.gnu.org/licenses/>.
 
-
 #include <sstream>
 #include <iterator>
-
-using namespace std;
-
 #include "report.h"
 #include "input.h"
+
+using namespace std;
+using namespace OpenHDM;
+
+// --------------------------------------------------------------------
+// This source file includes some of the function implementations of
+// the "Input" class defined in input.h
+// --------------------------------------------------------------------
 
 Input::Input(std::string fileFormat_, std::string filePath_):
     fileFormat(fileFormat_),

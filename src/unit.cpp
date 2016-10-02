@@ -17,12 +17,18 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenHDM.  If not, see <http://www.gnu.org/licenses/>.
 
-
 #include <iostream>
-
 #include "report.h"
 #include "patch.h"
 #include "unit.h"
+
+using namespace OpenHDM;
+
+// --------------------------------------------------------------------
+// This source file includes implementations for the "Unit" class,
+// which is used to encapsulate the discrete mesh data (e.g., nodes,
+// elements, cells, interfaces, etc.).
+// --------------------------------------------------------------------
 
 Unit::Unit(int id_):
     id(id_)

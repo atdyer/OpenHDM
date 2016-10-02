@@ -17,7 +17,6 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenHDM.  If not, see <http://www.gnu.org/licenses/>.
 
-
 #ifndef GRID_H
 #define GRID_H
 
@@ -30,27 +29,19 @@
 #include <list>
 #include <map>
 #include <unordered_map>
-
 #include "report.h"
 
-/* Unit, Patch, Grid:
- *
- * Computational grids of domains consist of three main containers:
- *
- * 1. Unit: The smallest data containers of grids, used to store point-wise data such as
- *          coordinates, water surface elevations, velocities, etc.
- *          e.g., nodes, cells, etc
- *          (see unit.h)
- *
- * 2. Patch: Containers used to designate the regions of grids at which the computations
- *          are carried out.
- *          (see patch.h)
- *
- * 3. Grid: A class template, which accepts a patch type and arbitrary number of unit types
- *          as arguments. Derived grid classes encapsulate the entire data of domain grids.
- */
+namespace OpenHDM {
 
-// Grid: ------------------------------------------------------------------------------------
+// --------------------------------------------------------------------
+// Grid: The variadic abstract class template Grid is the container and
+//   manager of discrete model data for individual domain instances. A
+//   derived grid class can have an arbitrary number of unit types,
+//   such as nodes, elements, cells, etc., depending on the type of the
+//   spatial discretization. A grid instance also owns one or more
+//   patches as members, which designate the active regions within the
+//   grid.
+// --------------------------------------------------------------------
 
 template <class patchType, class ...unitTypes>
 class Grid{
@@ -104,7 +95,7 @@ protected:
     std::list<int> vpids;  // vacant patch id's
 
     // Units:
-    std::tuple<std::vector<unitTypes>...> unitsTuple;            // main container for all units of any type
+    std::tuple<std::vector<unitTypes>...> unitsTuple;           // the container for all of the grid units (of any type)
     std::map< std::type_index, std::list<unsigned int> > upos;  // unit positions
     std::map< std::type_index, std::list<unsigned int> > vpos;  // vacant unit positions
 
@@ -334,5 +325,7 @@ bool Grid<patchType,unitTypes...>::isChild() const{
     if (parent) return true;
     return false;
 }
+
+} // end of namespace OpenHDM
 
 #endif // GRID_H

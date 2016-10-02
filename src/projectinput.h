@@ -17,15 +17,19 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenHDM.  If not, see <http://www.gnu.org/licenses/>.
 
-
 #ifndef PROJECTINPUT_H
 #define PROJECTINPUT_H
 
 #include "input.h"
 
-/*
- * ProjectInput: Main input of a Project Class object
- */
+namespace OpenHDM {
+
+// --------------------------------------------------------------------
+// ProjectInput: The concrete class, which is derived from "Input",
+//   encapsulates the data of project input files. For each OpenHDM
+//   run, users are required to provide a project input file which
+//   includes a list of domain(s) to be simulated.
+// --------------------------------------------------------------------
 
 class ProjectInput: public Input
 {
@@ -33,7 +37,7 @@ class ProjectInput: public Input
 
 public:
     ProjectInput(std::string projectFilePath);
-    ~ProjectInput();
+    ~ProjectInput(){}
 
     virtual void readInputFile()override;
 
@@ -61,5 +65,7 @@ private:
     std::vector<domainsListRow> domainsList;
 
 };
+
+} // end of namespace OpenHDM
 
 #endif // PROJECTINPUT_H

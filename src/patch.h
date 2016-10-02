@@ -17,7 +17,6 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenHDM.  If not, see <http://www.gnu.org/licenses/>.
 
-
 #ifndef PATCH_H
 #define PATCH_H
 
@@ -29,11 +28,17 @@
 #include <vector>
 #include <algorithm>
 
-/*
- * Patch: Containers of unit pointers to designate the regions of grids at which the
- *          computations are carried out.
- */
+namespace OpenHDM {
 
+// --------------------------------------------------------------------
+// Patch: The variadic abstract class template "Patch" is aimed to be
+//   used as a base class for specialized patch types which are used to
+//   designate the active regions of grids, i.e, the regions at which
+//   the numerical computations are to be carried out. Patch is
+//   designed to maintain pointers (as references) to the objects
+//   stored in Grid, and so similar to grids, patches can have an
+//   arbitrary number of unit types.
+// --------------------------------------------------------------------
 
 template <class ...UnitTypes>
 class Patch{
@@ -147,7 +152,7 @@ void Patch<UnitTypes...>::invalidate(){
     locked = true;
 }
 
-
+} // end of namespace OpenHDM
 
 
 #endif // PATCH_H

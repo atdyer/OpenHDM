@@ -17,15 +17,16 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenHDM.  If not, see <http://www.gnu.org/licenses/>.
 
-
 #ifndef UNIT_H
 #define UNIT_H
 
-/*
- * Unit: Smallest data containers of grids, used to store point-wise data such as
- *       coordinates, water surface elevations, velocities, etc.
- *       e.g., nodes, elements, cells, etc
-*/
+namespace OpenHDM {
+
+// --------------------------------------------------------------------
+// Unit: The abstract class "Unit" is aimed to be used as a base class
+//   for data structures encapsulating the discrete mesh data. Example
+//   derived unit types are nodes, elements, cells, interfaces, etc.
+// --------------------------------------------------------------------
 
 class Unit{
     template <class patchType, class ...unitTypes> friend class Grid;
@@ -69,5 +70,7 @@ private:
                             // wheras Unit::patchID is used to indentify a patch
 
 };
+
+} // end of namespace OpenHDM
 
 #endif // UNIT_H

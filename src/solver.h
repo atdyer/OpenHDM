@@ -17,7 +17,6 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenHDM.  If not, see <http://www.gnu.org/licenses/>.
 
-
 #ifndef SOLVER_H
 #define SOLVER_H
 
@@ -25,16 +24,17 @@
 #include <map>
 #include <unordered_map>
 #include <memory>
-
 #include "report.h"
 
-/* Solver: an abstract class template that accepts a type of a Grid as its template
- * parameter.
- *
- * A derived solver class instance is owned by a domain and it contains a grid and
- * a set of inputs/outputs. The implementations of numerical methods are provided in
- * the corresponding member functions of derived solver classes.
- */
+namespace OpenHDM {
+
+// --------------------------------------------------------------------
+// Solver: The abstract class template Solver is used as a base class
+//   for derived solver types that implement the computational tasks
+//   specific to the model and include the numerical libraries to be
+//   used.
+// --------------------------------------------------------------------
+
 template<class GridType>
 class Solver
 {
@@ -91,6 +91,6 @@ bool Solver<GridType>::isChild(){
     return false;
 }
 
-
+} // end of namespace OpenHDM
 
 #endif // SOLVER_H

@@ -17,13 +17,19 @@
 // You should have received a copy of the GNU General Public License
 // along with OpenHDM.  If not, see <http://www.gnu.org/licenses/>.
 
-
 #ifndef OUTPUT_H
 #define OUTPUT_H
 
 #include <iostream>
 #include <fstream>
 #include <vector>
+
+namespace OpenHDM {
+
+// --------------------------------------------------------------------
+// Output: The concrete "Output" class is aimed to be used as a base
+//   class for derived classes encapsulating model output files.
+// --------------------------------------------------------------------
 
 class Output
 {
@@ -53,5 +59,7 @@ protected:
     bool isChild;
 
 };
+
+} // end of namespace OpenHDM
 
 #endif // OUTPUT_H
