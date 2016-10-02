@@ -42,6 +42,7 @@ ProjectInput::ProjectInput(std::string projectFilePath):
 void ProjectInput::readInputFile(){
 
     std::string line = "";
+    std::string prjFileDir = getDir(filePath);
 
     openInputFile();
 
@@ -61,9 +62,9 @@ void ProjectInput::readInputFile(){
 
         // Generate a new domainsList entry, and initialize it using the parameters
         // from the list row.
-        domainsList.emplace_back(sLine[0],  // domainID
-                                 sLine[1],  // domainPath
-                                 sLine[2]); // outputDir
+        domainsList.emplace_back( sLine[0],                 // domainID
+                                  prjFileDir+'/'+sLine[1],  // domainPath
+                                  prjFileDir+'/'+sLine[2]); // outputDir
 
         // If the current row has 4 columns, i.e., if the domain is a child domain,
         // then set its parent id.
