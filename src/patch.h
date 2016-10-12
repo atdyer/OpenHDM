@@ -25,6 +25,7 @@
 #include <typeinfo>
 #include <typeindex>
 #include <tuple>
+#include <climits>
 #include <vector>
 #include <algorithm>
 
@@ -55,7 +56,7 @@ public:
 
 
     template <class UnitType>
-    void insertUnitPtr(UnitType * unitptr, unsigned int ts=0);
+    void insertUnitPtr(UnitType * unitptr, unsigned ts);
 
     template <class UnitType>
     void removeUnitPtr(UnitType * unitptr);
@@ -65,7 +66,7 @@ public:
     // attribute accessors:
     bool isLocked()const{return locked;}
     bool isUpToDate()const{return upToDate;}
-    int getID()const{return id;}
+    unsigned getID()const{return id;}
 
 protected:
 
@@ -79,9 +80,9 @@ protected:
     // stored are not invalidated! (See invalidate()).
 
 private:
-    bool upToDate=false;
-    bool locked=false;
-    int id=-1;
+    bool upToDate   = false;
+    bool locked     = false;
+    unsigned id     = UINT_MAX;
 
 };
 
@@ -99,7 +100,7 @@ Patch<UnitTypes...>::~Patch(){
 // Inserts a unit ptr to the patch, assigns patchPos of the unit, and activates the unit.
 template <class ...UnitTypes>
 template <class UnitType>
-void Patch<UnitTypes...>::insertUnitPtr(UnitType * unitptr, unsigned int ts){
+void Patch<UnitTypes...>::insertUnitPtr(UnitType * unitptr, unsigned ts){
 
     // Get a reference to the corresponding unitptrs vector in unitptrsTuple tuple:
     auto& unitptrs = std::get<std::vector<UnitType*>>(unitptrsTuple);

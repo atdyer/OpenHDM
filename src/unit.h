@@ -20,6 +20,8 @@
 #ifndef UNIT_H
 #define UNIT_H
 
+#include <climits>
+
 namespace OpenHDM {
 
 // --------------------------------------------------------------------
@@ -42,32 +44,32 @@ public:
     virtual ~Unit()=0;
 
     // attribute accessors:
-    int          getID()const{return id;}
-    unsigned int getPos()const{return pos;}
-    unsigned int getPatchPos()const{return patchPos;}
-    unsigned int getActivationTimestep()const{return activationTimestep;}
-    bool         isActive()const{return active;}
-    bool         isBoundary()const{return boundary;}
-    int          getPatchID()const{return patchID;}
+    int      getID()const{return id;}
+    unsigned getPos()const{return pos;}
+    unsigned getPatchPos()const{return patchPos;}
+    unsigned getActivationTimestep()const{return activationTimestep;}
+    bool     isActive()const{return active;}
+    bool     isBoundary()const{return boundary;}
+    unsigned getPatchID()const{return patchID;}
 
 protected:
 
     void deactivate();
-    void activate(unsigned int ts=0);
-    void setPos(unsigned int pos_in);
+    void activate(unsigned ts=0);
+    void setPos(unsigned pos_in);
 
 private:
 
     bool active          = false;
     bool boundary        = false;
-    unsigned int patchPos; // the position of the unit within a patch
-    unsigned int pos;   // index of the unit
-    unsigned int activationTimestep;
+    unsigned patchPos; // the position of the unit within a patch
+    unsigned pos;   // index of the unit
+    unsigned activationTimestep;
     const int id;       // constant id used for input/output
 
-    int patchID =       -1; // The id of the patch the node is included in.
-                            // Note that Unit::patchPos is used to indentify a unit,
-                            // wheras Unit::patchID is used to indentify a patch
+    unsigned patchID = UINT_MAX; // The id of the patch the node is included in.
+                                 // Note that Unit::patchPos is used to indentify a unit,
+                                 // wheras Unit::patchID is used to indentify a patch
 
 };
 

@@ -21,11 +21,13 @@
 #define GRID_H
 
 #include <iostream>
+#include <climits>
 #include <memory>
 #include <typeinfo>
 #include <typeindex>
 #include <tuple>
 #include <vector>
+#include <deque>
 #include <list>
 #include <map>
 #include <unordered_map>
@@ -77,10 +79,10 @@ public:
 
     // Functions for patch management:
     virtual void initializePatches()=0; // for parent domains
-    int addPatch();
+    unsigned addPatch();
     void removePatch(patchType &patch);
     void setPatchID(patchType &patch);
-    patchType & getPatch(int id);
+    patchType & getPatch(unsigned id);
 
     // attribute accessors:
     bool isChild()const;
@@ -91,7 +93,7 @@ protected:
     std::shared_ptr<Grid> parent;
 
     // Computational patches:
-    std::list<patchType> patches;
+    std::deque<patchType> patches;
     std::list<int> vpids;  // vacant patch id's
 
     // Units:
@@ -261,11 +263,9 @@ bool Grid<patchType,unitTypes...>::unitExists(int id, std::type_index &typeIndex
 
 // Adds a new patch in "patches" vector
 template <class patchType, class ...unitTypes>
-int Grid<patchType,unitTypes...>::addPatch(){
+unsigned Grid<patchType,unitTypes...>::addPatch(){
 
     // Add a new patch to the "patches" vector:
-    // Note: Instead of push_back() which copy constructs the patch, emplace_back() is used to
-    //       prevent the invalidations of reference-type members.
     patches.emplace_back();
 
     // Assign an id to the patch to be added:
@@ -276,12 +276,21 @@ int Grid<patchType,unitTypes...>::addPatch(){
 
 }
 
-// Removes a given patch from "patches" vector
+// Removes a given patch from "patches" deque
 template <class patchType, class ...unitTypes>
 void Grid<patchType,unitTypes...>::removePatch(patchType &patch){
 
-    // remove the patch;
-    patches.remove(patch);
+    // Get the index of the patch to remove:
+    unsigned pi = 0;
+    for (auto &p: patches){
+        if (p.getID()==patch.getID()){
+            break;
+        }
+        pi++;
+    }
+
+    // Remove the patch;
+    patches.erase(patches.begin()+pi);
 
 }
 
@@ -289,6 +298,12 @@ void Grid<patchType,unitTypes...>::removePatch(patchType &patch){
 template <class patchType, class ...unitTypes>
 void Grid<patchType,unitTypes...>::setPatchID(patchType &patch){
 
+    // Check if an id is already assigned:
+    if (patch.getID()!=UINT_MAX){
+        Report::error("Grid::setPatchID","An ID is already assigned to patch");
+    }
+
+    // Assign an id:
     if (vpids.size()>0){
         patch.setID(vpids.front());
         vpids.pop_front();
@@ -301,18 +316,18 @@ void Grid<patchType,unitTypes...>::setPatchID(patchType &patch){
 
 // Return a reference to the patch with given ID
 template <class patchType, class ...unitTypes>
-patchType& Grid<patchType,unitTypes...>::getPatch(int id){
+patchType& Grid<patchType,unitTypes...>::getPatch(unsigned id){
 
     patchType * patchToReturn = nullptr;
 
     for (auto &patch: patches){
-        if (patch.getID()== id){
+        if (patch.getID()==id){
             patchToReturn = &(patch);
         }
     }
 
     if (not patchToReturn){
-        Report::error("Grid::getPatch","No patch with given id exists");
+        Report::error("Grid::getPatch","No patch with the given id exists: "+std::to_string(id));
     }
 
     return std::ref(*patchToReturn);

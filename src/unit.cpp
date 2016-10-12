@@ -47,10 +47,11 @@ void Unit::deactivate(){
         Report::error("Unit deactivation","Unit "+std::to_string(id)+" is already deactivated.");
     }
     active = false;
+    patchID = INT_MAX;
 }
 
 // Activates the unit to include it in calculations
-void Unit::activate(unsigned int ts){
+void Unit::activate(unsigned ts){
 
     if (active){
         Report::error("Unit activation","Unit "+std::to_string(id)+" is already active."
@@ -62,7 +63,7 @@ void Unit::activate(unsigned int ts){
 }
 
 
-void Unit::setPos(unsigned int pos_in){
+void Unit::setPos(unsigned pos_in){
     pos = pos_in;
 }
 
