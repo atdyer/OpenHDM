@@ -79,7 +79,7 @@ public:
 
     // Functions for patch management:
     virtual void initializePatches()=0; // for parent domains
-    unsigned addPatch();
+    patchType & addPatch();
     void removePatch(patchType &patch);
     void setPatchID(patchType &patch);
     patchType & getPatch(unsigned id);
@@ -263,7 +263,7 @@ bool Grid<patchType,unitTypes...>::unitExists(int id, std::type_index &typeIndex
 
 // Adds a new patch in "patches" vector
 template <class patchType, class ...unitTypes>
-unsigned Grid<patchType,unitTypes...>::addPatch(){
+patchType& Grid<patchType,unitTypes...>::addPatch(){
 
     // Add a new patch to the "patches" vector:
     patches.emplace_back();
@@ -272,7 +272,7 @@ unsigned Grid<patchType,unitTypes...>::addPatch(){
     setPatchID(patches.back());
 
     // Return the new patch id:
-    return patches.back().getID();
+    return patches.back();
 
 }
 
