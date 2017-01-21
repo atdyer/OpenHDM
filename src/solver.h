@@ -56,7 +56,7 @@ public:
 
     // attribute accessors:
     const std::shared_ptr<GridType> &getGrid();       // returns a void pointer to its grid
-    bool       isChild();
+    bool       isChild() const;
 
 protected:
 
@@ -86,7 +86,7 @@ const std::shared_ptr<GridType>& Solver<GridType>::getGrid(){
 
 
 template<class GridType>
-bool Solver<GridType>::isChild(){
+bool Solver<GridType>::isChild() const{
     if (parent) return true;
     return false;
 }
