@@ -27,7 +27,6 @@
 #include <algorithm>
 #include <memory>
 #include <sstream>
-#include "threading.h"
 #include "projectinput.h"
 #include "report.h"
 
@@ -54,18 +53,17 @@ public:
     Project& operator=(const Project&)  = delete;
     Project(Project&&)                  = delete;
     Project& operator=(Project&&)       = delete;
-    ~Project();
+    ~Project(){}
 
     // parallel run:
-    void run(unsigned int nProcs=0);
+    void run(unsigned nProc=0);
 
 private:
 
     // runtime:
-    void initializeRun();
+    void initializeRun(unsigned nProc);
     void processTimesteppingParams();
-    void timestepping();                    // serial timestepping
-    void timestepping(unsigned int nProcs); // parallel timestepping
+    void initiateTimestepping();
     void finalizeRun();
 
     // domain management:
@@ -73,7 +71,7 @@ private:
     void removeDomain(const std::string domainID);
     void setDomainHierarchy();
     void processDomainsList(ProjectInput &projectInput);
-    unsigned int getDomainPosition(const std::string domainID);
+    unsigned getDomainPosition(const std::string domainID);
 
     // attribute accessor functions:
     size_t      nd() const;
@@ -86,15 +84,15 @@ private:
     std::string projectID = "";
 
     // internal members:
-    unsigned int    nts = 0;        // total no. of timesteps
+    unsigned    nts = 0;        // total no. of timesteps
     unsigned short  nPhases = 0;    // no. of phases at a timestep.
     std::vector<std::shared_ptr<domainClass>> domains;
     std::map<std::string,std::string> hierarchyTable;
 
 
     // multithreading:
-    void configThreadingHierarchy(unsigned int nProcs);
-    void check_nProcs(unsigned int &nProcs);
+    void setDomainConcurrency(unsigned nProc);
+    void check_nProc(unsigned &nProc);
     void check_multipleParents();
     std::vector<std::thread> threads;
 
@@ -118,26 +116,20 @@ Project<domainClass>::Project(ProjectInput &projectInput):
 
 }
 
-template <class domainClass>
-Project<domainClass>::~Project()
-{
-
-}
-
 // Performs the serial|parallel simulation of all domains in the project.
 template <class domainClass>
-void Project<domainClass>::run(unsigned int nProcs){
+void Project<domainClass>::run(unsigned nProc){
 
     // 1. Initialize:
     Report::log("Run is initializing:",1);
-    initializeRun();
+    initializeRun(nProc);
 
     // 2. Timestepping:
-    if (nProcs<2)   timestepping();         // serial
-    else            timestepping(nProcs);   // parallel
+    Report::log("Timestepping is starting...",1);
+    initiateTimestepping();
 
     // 3. Finalize:
-    Report::log("\n  Run is finalizing:",1);
+    Report::log("\n Run is finalizing:",1);
     finalizeRun();
 
 }
@@ -147,10 +139,13 @@ void Project<domainClass>::run(unsigned int nProcs){
 // includes instantiating domain grids, solvers, and outputs.
 // This function is called in Project<>::run()
 template <class domainClass>
-void Project<domainClass>::initializeRun(){
+void Project<domainClass>::initializeRun(unsigned nProc){
 
     // Construct the domain hierarchy:
     setDomainHierarchy();
+
+    // Configure multithreaded domain concurrency:
+    if (nProc>1) setDomainConcurrency(nProc);
 
     // Lazy initialization of members such as solvers, grids, outputs, etc.
     Report::log("Setting up the simulation",2);
@@ -175,60 +170,17 @@ void Project<domainClass>::initializeRun(){
 
 }
 
-
-// Serial Timestepping Routine
-template <class domainClass>
-void Project<domainClass>::timestepping(){
-
-    Report::log("Serial timestepping is starting...",1);
-
-    for (unsigned int ts=1; ts<=nts; ts++){
-
-        // Print timestep
-        if(ts>99 and ts%(nts/100)==0) std::cout << "\r \t %" << ts*100/nts << std::flush;
-
-        // Sequentially execute the phase functions of domains.
-        for (int p=0; p<nPhases; p++){
-            for (auto &domain : domains){
-                domain->phases[p](ts);
-            }
-        }
-
-    }// timestepping loop
-
-}
-
 // Parallel Timestepping Routine
 template <class domainClass>
-void Project<domainClass>::timestepping(unsigned int nProcs){
+void Project<domainClass>::initiateTimestepping(){
 
-    Report::log("Parallel timestepping is starting...",1);
-
-    configThreadingHierarchy(nProcs);
-
-    // Instantiate and execute the threads:
+    // Instantiate and execute timestepping thread for each domain:
     for (auto &domain: domains){
+
         threads.emplace_back( [&](){
-            Report::log("Executing the domain "+domain->getID(),1);
-
-            for (unsigned int ts=1; ts<=nts; ts++){
-                for (int p=0; p<nPhases; p++){
-
-                    // check if ready to execute the phase
-                    domain->phaseCheck();
-
-                    // execute the phase
-                    domain->phases[p](ts);
-
-                    // signal phase completion
-                    domain->completePhase();
-
-                }// phase loop
-            }// timestepping loop
-
+            domain->timestepping(nts);
         });
     }
-
 
     // Join and destruct the threads:
     for (auto &thread: threads){
@@ -325,20 +277,21 @@ void Project<domainClass>::setDomainHierarchy(){
     Report::log("Constructing domain hierarchy",2);
 
     for (auto &domain : domains){
-
         std::string domainID = domain->getID();
+
         if (hierarchyTable.find(domainID) != hierarchyTable.end() ){
 
+            // Get a pointer to parent domain:
             std::string parentID = hierarchyTable[domainID];
-            Report::log("Child: "+domainID+"  Parent: "+parentID,3);
-            std::shared_ptr<domainClass> child = getDomain(domainID);
             std::shared_ptr<domainClass> parent = getDomain(parentID);
 
-            // Add the child to childDomains vector of the parent domain:
-            parent->addChild(child);
-
+            // Set child domain hierarchy:
+            domain->setHierarchy(parent);
         }
-        domain->hierarchySet = true;
+        else{
+            // Set parent domain hierarchy:
+            domain->setHierarchy();
+        }
     }
 
 }
@@ -378,19 +331,19 @@ void Project<domainClass>::processTimesteppingParams(){
 template <class domainClass>
 void Project<domainClass>::removeDomain(const std::string domainID){
 
-    unsigned int pos = getDomainPosition(domainID);
+    unsigned pos = getDomainPosition(domainID);
     domains.erase(domains.begin()+pos);
 }
 
 
 // Returns the position of a domain in domains vector of the project
 template <class domainClass>
-unsigned int Project<domainClass>::getDomainPosition(const std::string domainID){
+unsigned Project<domainClass>::getDomainPosition(const std::string domainID){
 
     std::shared_ptr<domainClass> domain = getDomain(domainID);
 
     auto domainIt = std::find(domains.begin(), domains.end(), domain);
-    unsigned int pos = std::distance( domains.begin(),domainIt );
+    unsigned pos = std::distance( domains.begin(),domainIt );
     return pos;
 
 }
@@ -398,59 +351,50 @@ unsigned int Project<domainClass>::getDomainPosition(const std::string domainID)
 
 
 template <class domainClass>
-void Project<domainClass>::configThreadingHierarchy(unsigned int nProcs){
+void Project<domainClass>::setDomainConcurrency(unsigned nProc){
 
-    // Check nProcs and update if necessary
-    check_nProcs(nProcs);
+    // Check nProc and update if necessary
+    check_nProc(nProc);
 
     // Check if there are multiple parent domains
     check_multipleParents();
 
     // Initialize the thread pool and the mutex of the parent domain,
-    // fill in the vector of references to child domain cp's,
-    // and assign the corresponding pointers of child domains
+    // and provides child domains with pointers to concurrency constructs
     for (auto &domain : domains){
         if (domain->isParent()){
-            domain->threadPool          = std::make_shared<Threading::Pool>(nProcs);
-            domain->mtx                 = std::make_shared<std::mutex>();
-            domain->condition           = std::make_shared<std::condition_variable>();
-            domain->condition4children  = std::make_shared<std::condition_variable>();
 
+            // Parent domain:
+            domain->setConcurrency();
 
-            for (auto &childDomainWP: domain->childDomains){
-                auto childDomain = childDomainWP.lock();
-                childDomain->threadPool = domain->threadPool;
-                childDomain->mtx        = domain->mtx;
-                childDomain->condition  = domain->condition4children;
-
-                domain->childCPs.push_back(std::ref(childDomain->cp));
+            // Child domains:
+            for (auto &childWP: domain->childDomains){
+                auto child = childWP.lock();
+                child->setConcurrency();
             }
         }
     }
-
 }
 
 
-// Check if nProcs is greater than the number of threads available.
+// Check if nProc is greater than the number of threads available.
 // If so, set it to (available threads)-1.
 template <class domainClass>
-void Project<domainClass>::check_nProcs(unsigned int &nProcs){
+void Project<domainClass>::check_nProc(unsigned &nProc){
 
-    if (nProcs>std::thread::hardware_concurrency()){
+    if (nProc>std::thread::hardware_concurrency()){
         Report::warning("Concurrency!","Number of processors specified in CL ="
-                        +std::to_string(nProcs)+" is greater than the number of available"
+                        +std::to_string(nProc)+" is greater than the number of available"
                         " threads ="+std::to_string(std::thread::hardware_concurrency())
                         +"\n\t Setting number of processors to "
                         +std::to_string(std::thread::hardware_concurrency()-1),1);
-        nProcs = std::thread::hardware_concurrency()-1;
+        nProc = std::thread::hardware_concurrency()-1;
     }
 
 }
 
 
-
-
-// Check if nProcs is greater than the number of threads available.
+// Check if nProc is greater than the number of threads available.
 // If so, set it to (available threads)-1.
 template <class domainClass>
 void Project<domainClass>::check_multipleParents(){
