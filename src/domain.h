@@ -28,6 +28,7 @@
 #include <sstream>
 #include "threading.h"
 #include "report.h"
+#include <boost/progress.hpp>
 
 namespace OpenHDM {
 
@@ -64,18 +65,18 @@ public:
     virtual ~Domain(){}
 
     // attribute accessors:
-    bool            isParent()const;
-    bool            isChild()const;
-    bool            isInitialized()const;
-    bool            hierarchyIsSet()const;
-    std::string     getID()const;
-    std::string     getOutputDir()const;
-    int             get_nChild() const;
-    std::shared_ptr<Domain> getChild(unsigned int i);
-    std::shared_ptr<Domain> getParent();
-    short get_nPhases();
-    virtual unsigned int    get_nts()const=0;
-    const std::shared_ptr<SolverType>& getSolver()const;
+    bool            isParent()      const;
+    bool            isChild()       const;
+    bool            isInitialized() const {return initialized;}
+    bool            hierarchyIsSet()const {return hierarchySet;}
+    unsigned        get_nChild()    const {return childDomains.size();}
+    unsigned        get_nPhases()   const {return phases.size();}
+    std::string     getID()         const {return id;}
+    std::string     getOutputDir()  const {return outputDir;}
+    const std::shared_ptr<Domain> getParent()       const {return parent;}
+    const std::shared_ptr<SolverType>& getSolver()  const {return solver;}
+    const std::shared_ptr<Domain> getChild(unsigned i);
+    virtual unsigned get_nts()const=0;
 
 protected:
 
@@ -87,18 +88,25 @@ protected:
 
     // runtime:
     void timestepping(unsigned nts);
-
-    // hierarchy:
-    virtual bool setParent(std::shared_ptr<Domain> parent);
-    bool addChild(std::shared_ptr<Domain> newChild);
-    void setHierarchy(std::shared_ptr<Domain> parent=nullptr);
-
-    // concurrency and phases:
-    void setConcurrency(unsigned nProc=0);
-    void insertPhase(std::function<void(unsigned int)> phase);
+    void sequentialTimestepping(unsigned nts);
+    void concurrentTimestepping(unsigned nts);
 
     // post-processing routines after the run is completed:
     virtual void postProcess()=0;
+
+    // hierarchy:
+    void setHierarchy(std::shared_ptr<Domain> parent=nullptr);
+    bool addChild(std::shared_ptr<Domain> newChild);
+    virtual bool setParent(std::shared_ptr<Domain> parent);
+
+    // Inter-Domain Parallelism:
+    void setConcurrency(unsigned nProcTotal=0);
+    void insertPhase(std::function<void(unsigned)> phase);
+    void phaseCheck();
+    void completePhase();
+
+    // Intra-Domain Parallelism:
+    unsigned get_nProc_intraDomain() const{return nProc_intraDomain;}
 
     // input parameters:
     std::string id              = "";
@@ -109,27 +117,25 @@ protected:
     std::vector<std::weak_ptr<Domain>> childDomains;
     std::shared_ptr<SolverType> solver;
 
-    // multithreading:
-    void phaseCheck();
-    void completePhase();
-
 private:
 
     bool initialized    = false;
     bool hierarchySet   = false;
 
-    // phase container:
-    std::vector<std::function<void(unsigned int)>> phases;
-
-    // Multithreading
+    // Inter-Domain Parallelism:
     Threading::ControlPoint             cp;
     std::shared_ptr<Threading::Pool>    threadPool;
     std::shared_ptr<std::mutex>         mtx;
     std::shared_ptr<std::condition_variable> condition;
     std::shared_ptr<std::condition_variable> condition4children;
     std::vector<std::reference_wrapper<Threading::ControlPoint>> childCPs;
+    std::vector<std::function<void(unsigned int)>> phases;
+
+    // Intra-Domain Parallelism:
+    unsigned nProc_intraDomain = 1;
 
 };
+
 
 // Domain Constructor:
 template <class SolverType>
@@ -143,15 +149,15 @@ Domain<SolverType>::Domain(std::string  id_,
     solver(nullptr)
 {
     Report::log("Domain "+id+" is constructed.",2);
-
 }
+
 
 // Finalizes the domain initialization. Called before timestepping begins.
 template <class SolverType>
 void Domain<SolverType>::initialize(){
 
-    // Call the virtual function doInitialize(). The implementation of this function must
-    // be provided in derived classes.
+    // Call the virtual function doInitialize(). The implementation of this function
+    // must be provided in derived classes.
     doInitialize();
 
     // Set the domain as initialized.
@@ -159,11 +165,47 @@ void Domain<SolverType>::initialize(){
 }
 
 
-// Executes timestep "ts"
+// Determines the appropriate (sequential or concurrent) timestepping routine.
 template <class SolverType>
 void Domain<SolverType>::timestepping(unsigned nts){
 
     Report::log("Initiating timestepping for the domain "+getID(),1);
+
+    if (isParent() and get_nChild()==0){
+        sequentialTimestepping(nts);
+    }
+    else{
+        concurrentTimestepping(nts);
+    }
+}
+
+
+// Executes sequential timestepping routine for the domain.
+template <class SolverType>
+void Domain<SolverType>::sequentialTimestepping(unsigned nts){
+
+    // Create a progress display object:
+    boost::progress_display displayProgress(nts);
+
+    for (unsigned ts=1; ts<=nts; ts++){
+        for (auto &phase : phases){
+
+            // Execute the phase
+            phase(ts);
+        }
+
+        // Update progress display:
+        ++displayProgress;
+    }
+}
+
+
+// Executes concurrent and hierarchical timestepping routine for a domain
+template <class SolverType>
+void Domain<SolverType>::concurrentTimestepping(unsigned nts){
+
+    // Create a progress display pointer:
+    std::unique_ptr<boost::progress_display> displayProgress;
 
     for (unsigned ts=1; ts<=nts; ts++){
         for (auto &phase : phases){
@@ -176,10 +218,31 @@ void Domain<SolverType>::timestepping(unsigned nts){
 
             // Notify phase completion
             completePhase();
+        }
 
+        // Update progress display:
+        if (isParent()){
+            if (not displayProgress){
+                displayProgress=std::make_unique<boost::progress_display>(nts);
+            }
+            ++(*displayProgress);
         }
     }
 }
+
+
+// Configures hierarchy settings of the domain:
+template <class SolverType>
+void Domain<SolverType>::setHierarchy(std::shared_ptr<Domain> parent){
+
+    if (not (parent==nullptr)){
+        parent->addChild(this->shared_from_this());
+        Report::log("Child: "+getID()+"  Parent: "+parent->getID(),3);
+    }
+
+    hierarchySet = true;
+}
+
 
 // Adds a child to a parent domain.
 template <class SolverType>
@@ -200,23 +263,6 @@ bool Domain<SolverType>::addChild(std::shared_ptr<Domain<SolverType>> newChild){
     return true;
 }
 
-// Inserts a phase to the vector of phases. Each phase is sequentially executed at every timestep
-template <class SolverType>
-void Domain<SolverType>::insertPhase(std::function<void(unsigned int)> phase){
-
-    // add the function to the "phases" vector
-    phases.emplace_back(phase);
-
-    // increment the number of control points
-    (cp.ncp)++;
-
-    // check consistency
-    if (cp.ncp != phases.size()){
-        Report::error("Phasing!",
-                      "The number of phases and the number of control points are inconsistent");
-    }
-}
-
 
 // Assigns the parent domain of a child domain.
 template <class SolverType>
@@ -235,6 +281,70 @@ bool Domain<SolverType>::setParent(std::shared_ptr<Domain<SolverType>> pd){
     hierarchySet = true;
 
     return true;
+}
+
+
+// Configures domain concurrency constructs, e.g., mutexes and condition variables
+// of provides child domains with pointers to these constructs.
+template <class SolverType>
+void Domain<SolverType>::setConcurrency(unsigned nProcTotal){
+
+    if (not hierarchyIsSet()){
+        Report::error("Domain Concurrency Configuration",
+                      "Domain hierarchy is not set yet.");
+    }
+
+    if (isParent()){
+
+        if (get_nChild()==0){
+            // No children. Dedicate all available processors to parent:
+            nProc_intraDomain = std::max(unsigned(1), nProcTotal);
+        }
+        else{
+            // Dedicate ~50% of procs to inter-domain concurrency:
+            unsigned nProc_interDomain = std::max(unsigned(1),unsigned(nProcTotal/2.));
+
+            // Dedicate remaining procs to parent domain:
+            nProc_intraDomain = std::max(unsigned(1), nProcTotal-nProc_interDomain+1);
+
+            // Initialize inter-domain parallelism constructs:
+            threadPool          = std::make_shared<Threading::Pool>(nProc_interDomain);
+            mtx                 = std::make_shared<std::mutex>();
+            condition           = std::make_shared<std::condition_variable>();
+            condition4children  = std::make_shared<std::condition_variable>();
+
+            Report::log("Number of processors allocated for domain concurrency: "
+                        +std::to_string(nProc_interDomain), 2);
+        }
+        Report::log("Number of processors allocated for the parent: "
+                    +std::to_string(nProc_intraDomain), 2);
+    }
+    else{
+        // For the child domain, get pointers to parent domain concurrency constructs:
+        threadPool = parent->threadPool;
+        mtx        = parent->mtx;
+        condition  = parent->condition4children;
+        parent->childCPs.push_back(std::ref(cp));
+    }
+
+}
+
+
+// Inserts a phase to the vector of phases. Each phase is sequentially executed at every timestep
+template <class SolverType>
+void Domain<SolverType>::insertPhase(std::function<void(unsigned)> phase){
+
+    // add the function to the "phases" vector
+    phases.emplace_back(phase);
+
+    // increment the number of control points
+    (cp.ncp)++;
+
+    // check consistency
+    if (cp.ncp != phases.size()){
+        Report::error("Phasing!",
+                      "The number of phases and the number of control points are inconsistent");
+    }
 }
 
 
@@ -290,45 +400,6 @@ void Domain<SolverType>::completePhase(){
 
 }
 
-// Configures hierarchy of a domain within a project
-template <class SolverType>
-void Domain<SolverType>::setHierarchy(std::shared_ptr<Domain> parent){
-
-    if (not (parent==nullptr)){
-        parent->addChild(this->shared_from_this());
-    }
-
-    hierarchySet = true;
-
-    Report::log("Child: "+getID()+"  Parent: "+parent->getID(),3);
-}
-
-// Configures domain concurrency constructs, e.g., mutexes and condition variables
-// of provides child domains with pointers to these constructs.
-template <class SolverType>
-void Domain<SolverType>::setConcurrency(unsigned nProc){
-
-    if (not hierarchyIsSet()){
-        Report::error("Domain Concurrency Configuration",
-                      "Domain hierarchy is not set yet.");
-    }
-
-    if (isParent()){
-        threadPool          = std::make_shared<Threading::Pool>(nProc);
-        mtx                 = std::make_shared<std::mutex>();
-        condition           = std::make_shared<std::condition_variable>();
-        condition4children  = std::make_shared<std::condition_variable>();
-    }
-    else{
-        threadPool = parent->threadPool;
-        mtx        = parent->mtx;
-        condition  = parent->condition4children;
-        parent->childCPs.push_back(std::ref(cp));
-    }
-
-}
-
-
 // attribute accessors:
 
 template <class SolverType>
@@ -356,47 +427,7 @@ bool Domain<SolverType>::isChild()const{
 }
 
 template <class SolverType>
-bool Domain<SolverType>::isInitialized()const{
-    return initialized;
-}
-
-template <class SolverType>
-bool Domain<SolverType>::hierarchyIsSet()const{
-    return hierarchySet;
-}
-
-template <class SolverType>
-std::string Domain<SolverType>::getID()const{
-    return id;
-}
-
-template <class SolverType>
-std::string Domain<SolverType>::getOutputDir()const{
-    return outputDir;
-}
-
-template <class SolverType>
-const std::shared_ptr<SolverType> &Domain<SolverType>::getSolver()const{
-    return solver;
-}
-
-template <class SolverType>
-std::shared_ptr<Domain<SolverType>> Domain<SolverType>::getParent(){
-    return parent;
-}
-
-template <class SolverType>
-short Domain<SolverType>::get_nPhases(){
-    return short(phases.size());
-}
-
-template <class SolverType>
-int Domain<SolverType>::get_nChild()const{
-    return childDomains.size();
-}
-
-template <class SolverType>
-std::shared_ptr<Domain<SolverType>> Domain<SolverType>::getChild(unsigned int i){
+const std::shared_ptr<Domain<SolverType>> Domain<SolverType>::getChild(unsigned i){
 
     if ( i>=childDomains.size() ){
         std::stringstream s;
