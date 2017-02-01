@@ -61,19 +61,21 @@ public:
     // Functions for unit management:
 
     template <class unitType>
-    void insertUnit(unitType u);
+    void insertUnit(std::shared_ptr<unitType> u);
 
     template <class unitType>
-    void copyFromParent(unitType const & parentUnit);
+    void copyFromParent(const std::shared_ptr<unitType> parentUnit);
 
     template <class unitType>
-    void removeUnit(unitType const & u);
+    void removeUnit(const std::shared_ptr<unitType> unit);
 
     template <class unitType>
-    void setUnitPosition(unitType &u, std::vector<unitType> &units, std::type_index &typeIndex);
+    void setUnitPosition(std::shared_ptr<unitType> &u,
+                         std::vector<std::shared_ptr<unitType>> &units,
+                         std::type_index &typeIndex);
 
     template <class unitType>
-    bool confirmUnitPosition(unitType const &u)const;
+    bool confirmUnitPosition(const std::shared_ptr<unitType> &u)const;
 
     bool unitExists(int id, std::type_index &typeIndex);
 
@@ -97,7 +99,7 @@ protected:
     std::list<int> vpids;  // vacant patch id's
 
     // Units:
-    std::tuple<std::vector<unitTypes>...> unitsTuple;           // the container for all of the grid units (of any type)
+    std::tuple<std::vector<std::shared_ptr<unitTypes>>...> unitsTuple; // the container for all of the grid units (of any type)
     std::map< std::type_index, std::list<unsigned int> > upos;  // unit positions
     std::map< std::type_index, std::list<unsigned int> > vpos;  // vacant unit positions
 
@@ -121,23 +123,26 @@ Grid<patchType,unitTypes...>::Grid(std::shared_ptr<Grid> parent_):
 // Inserts a unit of any type to unitsTuple
 template <class patchType, class ...unitTypes>
 template <class unitType>
-void Grid<patchType,unitTypes...>::insertUnit(unitType u){
+void Grid<patchType,unitTypes...>::insertUnit(std::shared_ptr<unitType> unit){
 
+    // Determine the type of the unit to be inserted:
     auto typeIndex = std::type_index(typeid(unitType));
-    auto& units = std::get<std::vector<unitType>>(unitsTuple);
+
+    // Get a reference to the vector of units of type "unitType":
+    auto& units = std::get<std::vector<std::shared_ptr<unitType>>>(unitsTuple);
 
     // Assign a position to the unit to be inserted:
-    setUnitPosition(u, units, typeIndex);
+    setUnitPosition(unit, units, typeIndex);
 
     // Add the unit to the end of the "units" vector
-    units.push_back(u);
+    units.push_back(unit);
 
     // Update positions list:
     std::list<unsigned int> &up = upos[typeIndex];
-    up.push_back(units.back().getPos());
+    up.push_back(units.back()->getPos());
 
     // Update id2pos
-    id2pos[typeIndex][units.back().getID()] = units.back().getPos();
+    id2pos[typeIndex][units.back()->getID()] = units.back()->getPos();
 
     // Adding to and removing from "units" vector may invalidate references to elements of the
     // vector which are stored in "unitptrs" of patches. Inform all the patches of the grid:
@@ -151,21 +156,27 @@ void Grid<patchType,unitTypes...>::insertUnit(unitType u){
 // Copies a parent unit and inserts it to unitsTuple
 template <class patchType, class ...unitTypes>
 template <class unitType>
-void Grid<patchType,unitTypes...>::copyFromParent(unitType const & parentUnit){
+void Grid<patchType,unitTypes...>::copyFromParent(const std::shared_ptr<unitType> parentUnit){
 
+    // Determine the type of the unit to be copied:
     auto typeIndex = std::type_index(typeid(unitType));
-    auto& units = std::get<std::vector<unitType>>(unitsTuple);
+
+    // Get a reference to the vector of units of type "unitType":
+    auto& units = std::get<std::vector<std::shared_ptr<unitType>>>(unitsTuple);
 
     if (not isChild()){
         Report::error("Grid","Cannot copy unit from parent grid."
                       " The grid belongs to a parent domain");
     }
 
-    // Insert a new unit which is copy constructed using the parentUnit as argument.
-    insertUnit(unitType(parentUnit));
+    // Copy-construct the unit:
+    std::shared_ptr<unitType> copyUnit = std::make_shared<unitType>(*parentUnit);
 
-    unsigned int parentPos = parentUnit.getPos();
-    unsigned int childPos = units.back().getPos();
+    // Insert the new unit to the grid:
+    insertUnit(copyUnit);
+
+    unsigned int parentPos = parentUnit->getPos();
+    unsigned int childPos = units.back()->getPos();
 
     // Construct the mapping from child unit positions to parent unit positions
     cp2pp[typeIndex][childPos] = parentPos;
@@ -178,17 +189,18 @@ void Grid<patchType,unitTypes...>::copyFromParent(unitType const & parentUnit){
 // Note: Avoid using this function. Always prefer to deactivate the unit instead.
 template <class patchType, class ...unitTypes>
 template <class unitType>
-void Grid<patchType,unitTypes...>::removeUnit(const unitType &u){
+void Grid<patchType,unitTypes...>::removeUnit(const std::shared_ptr<unitType> unit){
 
-    Report::warning("Removing Unit at position "+std::to_string(u.getPos())+"\n",1);
-
+    // Determine the type of the unit to be copied:
     auto typeIndex = std::type_index(typeid(unitType));
-    auto& units = std::get<std::vector<unitType>>(unitsTuple);
+
+    // Get a reference to the vector of units of type "unitType":
+    auto& units = std::get<std::vector<std::shared_ptr<unitType>>>(unitsTuple);
 
     // get the position of the unit:
-    if ( not confirmUnitPosition(u) )
+    if ( not confirmUnitPosition(unit) )
         Report::error("Grid::removeUnit","Unit position to be removed is incorrect.");
-    unsigned int pos = u.getPos();
+    unsigned int pos = unit->getPos();
 
     // Update position lists:
     std::list<unsigned int> &up = upos[typeIndex];
@@ -197,13 +209,13 @@ void Grid<patchType,unitTypes...>::removeUnit(const unitType &u){
     vp.push_back(pos);
 
     // remove the unit
-    units.erase(units.begin()+pos);
+    units.erase(std::remove(units.begin(), units.end(), unit), units.end());
 
     // Update positions of the units after "u":
     for (size_t i=pos; i<units.size(); i++){
         units[i]->pos--;
         // Update id2pos
-        (id2pos[typeIndex][units[i].getID()] )--;
+        (id2pos[typeIndex][units[i]->getID()] )--;
     }
 
     // Adding to and removing from "units" vector may invalidate references to elements of the
@@ -219,18 +231,18 @@ void Grid<patchType,unitTypes...>::removeUnit(const unitType &u){
 // Sets the position of a new unit.
 template <class patchType, class ...unitTypes>
 template <class unitType>
-void Grid<patchType,unitTypes...>::setUnitPosition(unitType &u,
-                                                   std::vector<unitType> &units,
+void Grid<patchType,unitTypes...>::setUnitPosition(std::shared_ptr<unitType> &unit,
+                                                   std::vector<std::shared_ptr<unitType>> &units,
                                                    std::type_index &typeIndex){
 
     std::list<unsigned int> &vp = vpos[typeIndex];
 
     if (vp.size()>0){
-        u.pos = vp.front();
+        unit->pos = vp.front();
         vp.pop_front();
     }
     else{
-        u.pos = unsigned(units.size());
+        unit->pos = unsigned(units.size());
     }
 }
 
@@ -238,13 +250,14 @@ void Grid<patchType,unitTypes...>::setUnitPosition(unitType &u,
 // Ensures that the position of a unit is accurate
 template <class patchType, class ...unitTypes>
 template <class unitType>
-bool Grid<patchType,unitTypes...>::confirmUnitPosition(unitType const &u)const{
+bool Grid<patchType,unitTypes...>::confirmUnitPosition(const std::shared_ptr<unitType> &unit)const{
 
-    auto& units = std::get<std::vector<unitType>>(unitsTuple);
+    // Get a reference to the vector of units of type "unitType":
+    auto& units = std::get<std::vector<std::shared_ptr<unitType>>>(unitsTuple);
 
-    auto it = std::find( units.begin(), units.end(), u);
+    auto it = std::find( units.begin(), units.end(), unit);
     unsigned int pos = std::distance(units.begin(),it);
-    return (pos==u.getPos());
+    return (pos==unit->getPos());
 }
 
 

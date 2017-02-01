@@ -41,25 +41,25 @@ namespace OpenHDM {
 //   arbitrary number of unit types.
 // --------------------------------------------------------------------
 
-template <class ...UnitTypes>
+template <class ...unitTypes>
 class Patch{
     template <class pType, class ...uTypes> friend class Grid;
 
 public:
 
-    Patch();
-    Patch(const Patch&) = default;
-    Patch& operator=(const Patch&) = default;
-    Patch(Patch&&) = default;
-    Patch& operator=(Patch&&) = default;
-    virtual ~Patch();
+    Patch(){}
+    Patch(const Patch&)             = default;
+    Patch& operator=(const Patch&)  = default;
+    Patch(Patch&&)                  = default;
+    Patch& operator=(Patch&&)       = default;
+    virtual ~Patch()                = default;
 
 
-    template <class UnitType>
-    void insertUnitPtr(UnitType * unitptr, unsigned ts);
+    template <class unitType>
+    void includeUnit(const std::shared_ptr<unitType> unit, unsigned ts);
 
-    template <class UnitType>
-    void removeUnitPtr(UnitType * unitptr);
+    template <class unitType>
+    void excludeUnit(const std::shared_ptr<unitType> unit);
 
     void invalidate();
 
@@ -73,11 +73,8 @@ protected:
     void setID(int patchID){id=patchID;}
     void validate(){upToDate=true;}
 
-    std::tuple<std::vector<UnitTypes*>...> unitptrsTuple;
-    // ^ This vector of tuples contains pointers to units of the patch instance. (The pointed units
-    // are normally stored in "unitsTuple" container of the associated grid instance.)
-    // Important: Before dereferencing the elements of unitptrs, ensure that the pointers
-    // stored are not invalidated! (See invalidate()).
+    std::tuple<std::vector<std::shared_ptr<unitTypes>>...> unitsTuple;
+    // ^ This vector of tuples contains pointers to units of the patch instance.
 
 private:
     bool upToDate   = false;
@@ -86,69 +83,58 @@ private:
 
 };
 
-template <class ...UnitTypes>
-Patch<UnitTypes...>::Patch()
-{
-
-}
-
-template <class ...UnitTypes>
-Patch<UnitTypes...>::~Patch(){
-
-}
-
 // Inserts a unit ptr to the patch, assigns patchPos of the unit, and activates the unit.
-template <class ...UnitTypes>
-template <class UnitType>
-void Patch<UnitTypes...>::insertUnitPtr(UnitType * unitptr, unsigned ts){
+template <class ...unitTypes>
+template <class unitType>
+void Patch<unitTypes...>::includeUnit(const std::shared_ptr<unitType> unit, unsigned ts){
 
-    // Get a reference to the corresponding unitptrs vector in unitptrsTuple tuple:
-    auto& unitptrs = std::get<std::vector<UnitType*>>(unitptrsTuple);
+    // Get a reference to the vector of units of type "unitType":
+    auto& units = std::get<std::vector<std::shared_ptr<unitType>>>(unitsTuple);
 
-    // Determine and assign the position of the unitptr in unitptrs vector:
-    unitptr->patchPos = unsigned(unitptrs.size());
+    // Determine and assign the position of the unitptr in units vector:
+    unit->patchPos = unsigned(units.size());
 
     // Activate the unit:
-    unitptr->activate(ts);
+    unit->activate(ts);
 
     // Let unit store the id of the patch it is included in
-    unitptr->patchID = getID();
+    unit->patchID = getID();
 
-    // Insert the unitptr to unitptrs vector
-    unitptrs.push_back(unitptr);
+    // Insert the unitptr to units vector
+    units.push_back(unit);
 
 }
 
 // Removes a unit ptr from the patch, deactivates the unit and updates patchPos of units
 // placed after the unit removed from the patch.
-template <class ...UnitTypes>
-template <class UnitType>
-void Patch<UnitTypes...>::removeUnitPtr(UnitType * unitptr){
+template <class ...unitTypes>
+template <class unitType>
+void Patch<unitTypes...>::excludeUnit(const std::shared_ptr<unitType> unit){
 
-    // Get a reference to the corresponding unitptrs vector in unitptrsTuple tuple:
-    auto& unitptrs = std::get<std::vector<UnitType*>>(unitptrsTuple);
+    // Get a reference to the vector of units of type "unitType":
+    auto& units = std::get<std::vector<std::shared_ptr<unitType>>>(unitsTuple);
 
-    // Unit position inside unitptrs:
-    unsigned int patchPos = unitptr->getPatchPos();
+    // Unit position inside units:
+    unsigned patchPos = unit->getPatchPos();
 
     // Deactivate the unit:
-    unitptr->deactivate();
+    unit->deactivate();
 
-    // Erase the pointer from unitptrs:
-    unitptrs.erase(std::remove(unitptrs.begin(),unitptrs.end(),unitptr),unitptrs.end());
+    // Exclude the unit
+    units.erase(std::remove(units.begin(), units.end(), unit), units.end());
 
     // Update the positions of units after the deleted unitptr:
-    unsigned int newSize = (unsigned)(unitptrs.size());
-    for (unsigned int i=patchPos; i<newSize; i++){
-        (unitptrs[i]->patchPos)--;
+    unsigned newSize = (unsigned)(units.size());
+    for (unsigned i=patchPos; i<newSize; i++){
+        (units[i]->patchPos)--;
     }
 }
 
 
 // This function is called by the associated grid object whenever an operation that may invalidate
 // the pointers of the elements of tuple "unitsTuple" is performed.
-template <class ...UnitTypes>
-void Patch<UnitTypes...>::invalidate(){
+template <class ...unitTypes>
+void Patch<unitTypes...>::invalidate(){
     upToDate = false;
     locked = true;
 }
