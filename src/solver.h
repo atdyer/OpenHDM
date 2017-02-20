@@ -55,7 +55,7 @@ public:
     virtual void imposePatchBCs(unsigned int phase)=0;
 
     // attribute accessors:
-    const std::shared_ptr<GridType> &getGrid();       // returns a void pointer to its grid
+    const std::shared_ptr<GridType> &getGrid() const;       // returns a void pointer to its grid
     bool       isChild() const;
 
 protected:
@@ -80,7 +80,7 @@ Solver<GridType>::~Solver()
 }
 
 template<class GridType>
-const std::shared_ptr<GridType>& Solver<GridType>::getGrid(){
+const std::shared_ptr<GridType>& Solver<GridType>::getGrid() const{
     return grid;
 }
 

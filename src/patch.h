@@ -28,6 +28,7 @@
 #include <climits>
 #include <vector>
 #include <algorithm>
+#include "uref.h"
 
 namespace OpenHDM {
 
@@ -47,21 +48,27 @@ class Patch{
 
 public:
 
-    Patch();
+    Patch(){}
     Patch(const Patch&) = default;
     Patch& operator=(const Patch&) = default;
     Patch(Patch&&) = default;
     Patch& operator=(Patch&&) = default;
-    virtual ~Patch();
+    virtual ~Patch(){}
 
 
     template <class UnitType>
-    void insertUnitPtr(UnitType * unitptr, unsigned ts);
+    void includeUnit(const mref<UnitType>& unit, unsigned ts);
 
     template <class UnitType>
-    void removeUnitPtr(UnitType * unitptr);
+    void excludeUnit(const mref<UnitType>& unit);
 
     void invalidate();
+
+    // Returns the vector of unit references:
+    template <class unitType>
+    const auto& get_units()const{
+        return std::get<std::vector<mref<unitType>>>(mrefsTuple);
+    }
 
     // attribute accessors:
     bool isLocked()const{return locked;}
@@ -73,74 +80,62 @@ protected:
     void setID(int patchID){id=patchID;}
     void validate(){upToDate=true;}
 
-    std::tuple<std::vector<UnitTypes*>...> unitptrsTuple;
-    // ^ This vector of tuples contains pointers to units of the patch instance. (The pointed units
-    // are normally stored in "unitsTuple" container of the associated grid instance.)
-    // Important: Before dereferencing the elements of unitptrs, ensure that the pointers
-    // stored are not invalidated! (See invalidate()).
-
 private:
+
+    // references to grid units included in the patch
+    std::tuple<std::vector<mref<UnitTypes>>...> mrefsTuple;
+
     bool upToDate   = false;
     bool locked     = false;
     unsigned id     = UINT_MAX;
 
 };
 
-template <class ...UnitTypes>
-Patch<UnitTypes...>::Patch()
-{
 
-}
-
-template <class ...UnitTypes>
-Patch<UnitTypes...>::~Patch(){
-
-}
-
-// Inserts a unit ptr to the patch, assigns patchPos of the unit, and activates the unit.
+// Includes a unit in the patch and activates the unit. (The parameter "ts":
+// timestep at which the unit is included in the patch.)
 template <class ...UnitTypes>
 template <class UnitType>
-void Patch<UnitTypes...>::insertUnitPtr(UnitType * unitptr, unsigned ts){
+void Patch<UnitTypes...>::includeUnit(const mref<UnitType>& unit, unsigned ts){
 
     // Get a reference to the corresponding unitptrs vector in unitptrsTuple tuple:
-    auto& unitptrs = std::get<std::vector<UnitType*>>(unitptrsTuple);
+    auto& mrefs = std::get<std::vector<mref<UnitType>>>(mrefsTuple);
 
     // Determine and assign the position of the unitptr in unitptrs vector:
-    unitptr->patchPos = unsigned(unitptrs.size());
+    unit().patchPos = unsigned(mrefs.size());
 
     // Activate the unit:
-    unitptr->activate(ts);
+    unit().activate(ts);
 
-    // Let unit store the id of the patch it is included in
-    unitptr->patchID = getID();
+    // Let unit store the id of the patch it is included in:
+    unit().patchID = getID();
 
-    // Insert the unitptr to unitptrs vector
-    unitptrs.push_back(unitptr);
-
+    // Add a copy of unit reference to this patch:
+    mrefs.emplace_back(mref<UnitType>(unit));
 }
 
 // Removes a unit ptr from the patch, deactivates the unit and updates patchPos of units
 // placed after the unit removed from the patch.
 template <class ...UnitTypes>
 template <class UnitType>
-void Patch<UnitTypes...>::removeUnitPtr(UnitType * unitptr){
+void Patch<UnitTypes...>::excludeUnit(const mref<UnitType>& unit){
 
     // Get a reference to the corresponding unitptrs vector in unitptrsTuple tuple:
-    auto& unitptrs = std::get<std::vector<UnitType*>>(unitptrsTuple);
+    auto& mrefs = std::get<std::vector<mref<UnitType>>>(mrefsTuple);
 
     // Unit position inside unitptrs:
-    unsigned int patchPos = unitptr->getPatchPos();
+    unsigned int patchPos = unit().getPatchPos();
 
     // Deactivate the unit:
-    unitptr->deactivate();
+    unit().deactivate();
 
     // Erase the pointer from unitptrs:
-    unitptrs.erase(std::remove(unitptrs.begin(),unitptrs.end(),unitptr),unitptrs.end());
+    mrefs.erase(mrefs.begin()+patchPos);
 
     // Update the positions of units after the deleted unitptr:
-    unsigned int newSize = (unsigned)(unitptrs.size());
-    for (unsigned int i=patchPos; i<newSize; i++){
-        (unitptrs[i]->patchPos)--;
+    unsigned newSize = (unsigned)(mrefs.size());
+    for (unsigned i=patchPos; i<newSize; i++){
+        (mrefs[i]().patchPos)--;
     }
 }
 

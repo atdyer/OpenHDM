@@ -31,6 +31,7 @@
 #include <list>
 #include <map>
 #include <unordered_map>
+#include "uref.h"
 #include "report.h"
 
 namespace OpenHDM {
@@ -75,7 +76,14 @@ public:
     template <class unitType>
     bool confirmUnitPosition(unitType const &u)const;
 
-    bool unitExists(int id, std::type_index &typeIndex);
+    template <class unitType>
+    bool unitExists(int id)const;
+
+    template <class unitType>
+    const auto& get_units()const;
+
+    template <class unitType>
+    const auto& get_unit(int id)const;
 
     // Functions for patch management:
     virtual void initializePatches()=0; // for parent domains
@@ -90,33 +98,37 @@ public:
 
 protected:
 
+
     std::shared_ptr<Grid> parent;
 
     // Computational patches:
     std::deque<patchType> patches;
     std::list<int> vpids;  // vacant patch id's
 
-    // Units:
-    std::tuple<std::vector<unitTypes>...> unitsTuple;           // the container for all of the grid units (of any type)
     std::map< std::type_index, std::list<unsigned int> > upos;  // unit positions
     std::map< std::type_index, std::list<unsigned int> > vpos;  // vacant unit positions
 
     // mapping from id's of units to their position in vector "units":
-    std::map< std::type_index, std::unordered_map<int,unsigned int> > id2pos;
+    mutable std::map< std::type_index, std::unordered_map<int,unsigned int> > id2pos;
 
     // mapping from positions of child domain units to positions of corresponding parent domain units
     std::map< std::type_index, std::unordered_map<unsigned int,unsigned int> > cp2pp;
 
     // mapping from positions of parent domain units to positions of corresponding child domain units
     std::map< std::type_index, std::unordered_map<unsigned int,unsigned int> > pp2cp;
+
+private:
+
+    // Units:
+    std::tuple<std::vector<unitTypes>...> unitsTuple;   // the main container for all of the grid units (of any type)
+    std::tuple<std::vector<cref<unitTypes>>...> crefsTuple;  // references to grid units
 };
 
+// Constructor:
 template <class patchType, class ...unitTypes>
 Grid<patchType,unitTypes...>::Grid(std::shared_ptr<Grid> parent_):
     parent(parent_)
-{
-
-}
+{}
 
 // Inserts a unit of any type to unitsTuple
 template <class patchType, class ...unitTypes>
@@ -125,12 +137,28 @@ void Grid<patchType,unitTypes...>::insertUnit(unitType u){
 
     auto typeIndex = std::type_index(typeid(unitType));
     auto& units = std::get<std::vector<unitType>>(unitsTuple);
+    auto& crefs = std::get<std::vector<cref<unitType>>>(crefsTuple);
+
+    // Check if it is necessary to revalidate crefs:
+    bool revalidate = false;
+    if (units.size() == units.capacity()) revalidate = true;
 
     // Assign a position to the unit to be inserted:
     setUnitPosition(u, units, typeIndex);
 
     // Add the unit to the end of the "units" vector
-    units.push_back(u);
+    units.emplace_back(std::move(u));
+
+    // Create a root cref pointing to the inserted element:
+    crefs.emplace_back(cref<unitType>(units.back()));
+
+    // If necessary, revalidate all crefs of type unitType:
+    if (revalidate){
+        unsigned nUnits = units.size();
+        for (unsigned i=0; i<nUnits; ++i){
+            crefs[i].revalidate(units[i]);
+        }
+    }
 
     // Update positions list:
     std::list<unsigned int> &up = upos[typeIndex];
@@ -148,6 +176,7 @@ void Grid<patchType,unitTypes...>::insertUnit(unitType u){
     }
 }
 
+/*
 // Copies a parent unit and inserts it to unitsTuple
 template <class patchType, class ...unitTypes>
 template <class unitType>
@@ -172,7 +201,6 @@ void Grid<patchType,unitTypes...>::copyFromParent(unitType const & parentUnit){
     pp2cp[typeIndex][parentPos] = childPos;
 
 }
-
 
 // Removes a given unit
 // Note: Avoid using this function. Always prefer to deactivate the unit instead.
@@ -215,6 +243,7 @@ void Grid<patchType,unitTypes...>::removeUnit(const unitType &u){
     }
 
 }
+*/
 
 // Sets the position of a new unit.
 template <class patchType, class ...unitTypes>
@@ -234,7 +263,7 @@ void Grid<patchType,unitTypes...>::setUnitPosition(unitType &u,
     }
 }
 
-
+/*
 // Ensures that the position of a unit is accurate
 template <class patchType, class ...unitTypes>
 template <class unitType>
@@ -246,19 +275,44 @@ bool Grid<patchType,unitTypes...>::confirmUnitPosition(unitType const &u)const{
     unsigned int pos = std::distance(units.begin(),it);
     return (pos==u.getPos());
 }
+*/
 
 
 // Checks if a unit exists by searching the corresponging vector in "id2pos" map
 template <class patchType, class ...unitTypes>
-bool Grid<patchType,unitTypes...>::unitExists(int id, std::type_index &typeIndex){
+template <class unitType>
+bool Grid<patchType,unitTypes...>::unitExists(int id)const{
+
+    auto typeIndex = std::type_index(typeid(unitType));
 
     if (id2pos[typeIndex].find(id) == id2pos[typeIndex].end()){
         return false;
     }
-    else{
-        return true;
+    return true;
+}
+
+// Returns the unit vector storing units of type "unitType"
+template <class patchType, class ...unitTypes>
+template <class unitType>
+const auto& Grid<patchType,unitTypes...>::get_units()const{
+    return std::get<std::vector<cref<unitType>>>(crefsTuple);
+}
+
+// Returns a reference to the unit of type "unitType" with the given id:
+template <class patchType, class ...unitTypes>
+template <class unitType>
+const auto& Grid<patchType,unitTypes...>::get_unit(int id)const{
+
+    auto typeIndex = std::type_index(typeid(unitType));
+    auto& crefs = std::get<std::vector<cref<unitType>>>(crefsTuple);
+
+    // Check if a unit with given ID exists:
+    auto it = id2pos[typeIndex].find(id);
+    if (it == id2pos[typeIndex].end()){
+        Report::error("Grid","No unit exists with the given ID: "+std::to_string(id));
     }
 
+    return crefs[it->second];
 }
 
 // Adds a new patch in "patches" vector
@@ -333,7 +387,6 @@ patchType& Grid<patchType,unitTypes...>::getPatch(unsigned id){
     return std::ref(*patchToReturn);
 
 }
-
 
 template <class patchType, class ...unitTypes>
 bool Grid<patchType,unitTypes...>::isChild() const{
