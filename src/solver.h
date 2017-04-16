@@ -24,6 +24,7 @@
 #include <map>
 #include <unordered_map>
 #include <memory>
+#include <deque>
 #include "report.h"
 
 namespace OpenHDM {
@@ -55,19 +56,18 @@ public:
     virtual void imposePatchBCs(unsigned int phase)=0;
 
     // attribute accessors:
-    const std::shared_ptr<GridType> &getGrid();       // returns a void pointer to its grid
-    bool       isChild() const;
+    bool    isChild() const;
+    size_t  nGrids() const{return grids.size();}
 
 protected:
 
-    std::shared_ptr<GridType> grid;
+    std::deque<GridType> grids;
     std::shared_ptr<Solver<GridType>> parent;
 
 };
 
 template<class GridType>
 Solver<GridType>::Solver(std::shared_ptr<Solver<GridType>> parent_):
-    grid(nullptr),
     parent(parent_)
 {
 
@@ -78,12 +78,6 @@ Solver<GridType>::~Solver()
 {
 
 }
-
-template<class GridType>
-const std::shared_ptr<GridType>& Solver<GridType>::getGrid(){
-    return grid;
-}
-
 
 template<class GridType>
 bool Solver<GridType>::isChild() const{

@@ -50,7 +50,7 @@ class Grid{
 public:
 
     // Constructors & operators:
-    Grid(std::shared_ptr<Grid> parent_);
+    Grid(){};
     Grid(const Grid&) = default;
     Grid& operator=(const Grid&) = default;
     Grid(Grid&&) = default;
@@ -85,12 +85,9 @@ public:
     patchType & getPatch(unsigned id);
 
     // attribute accessors:
-    bool isChild()const;
     unsigned int get_id2pos(int id, std::type_index &typeIndex){return id2pos[typeIndex][id];}
 
 protected:
-
-    std::shared_ptr<Grid> parent;
 
     // Computational patches:
     std::deque<patchType> patches;
@@ -111,12 +108,6 @@ protected:
     std::map< std::type_index, std::unordered_map<unsigned int,unsigned int> > pp2cp;
 };
 
-template <class patchType, class ...unitTypes>
-Grid<patchType,unitTypes...>::Grid(std::shared_ptr<Grid> parent_):
-    parent(parent_)
-{
-
-}
 
 // Inserts a unit of any type to unitsTuple
 template <class patchType, class ...unitTypes>
@@ -155,11 +146,6 @@ void Grid<patchType,unitTypes...>::copyFromParent(unitType const & parentUnit){
 
     auto typeIndex = std::type_index(typeid(unitType));
     auto& units = std::get<std::vector<unitType>>(unitsTuple);
-
-    if (not isChild()){
-        Report::error("Grid","Cannot copy unit from parent grid."
-                      " The grid belongs to a parent domain");
-    }
 
     // Insert a new unit which is copy constructed using the parentUnit as argument.
     insertUnit(unitType(parentUnit));
@@ -332,13 +318,6 @@ patchType& Grid<patchType,unitTypes...>::getPatch(unsigned id){
 
     return std::ref(*patchToReturn);
 
-}
-
-
-template <class patchType, class ...unitTypes>
-bool Grid<patchType,unitTypes...>::isChild() const{
-    if (parent) return true;
-    return false;
 }
 
 } // end of namespace OpenHDM
