@@ -99,7 +99,7 @@ protected:
     std::map< std::type_index, std::list<unsigned int> > vpos;  // vacant unit positions
 
     // mapping from id's of units to their position in vector "units":
-    std::map< std::type_index, std::unordered_map<int,unsigned int> > id2pos;
+    mutable std::map< std::type_index, std::unordered_map<int,unsigned int> > id2pos;
 
     // mapping from positions of child domain units to positions of corresponding parent domain units
     std::map< std::type_index, std::unordered_map<unsigned int,unsigned int> > cp2pp;

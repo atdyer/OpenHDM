@@ -58,6 +58,7 @@ public:
     // attribute accessors:
     bool    isChild() const;
     size_t  nGrids() const{return grids.size();}
+    const auto& getGrids()const{return grids;}
 
 protected:
 
