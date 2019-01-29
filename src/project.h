@@ -55,12 +55,12 @@ public:
     Project& operator=(Project&&)       = delete;
     ~Project(){}
 
-    void run(unsigned nProc=0);
+    void run(unsigned nProcTotal=0, unsigned nProcChild=0);
 
 private:
 
     // Runtime:
-    void initializeRun(unsigned nProc);
+    void initializeRun(unsigned nProcTotal, unsigned nProcChild);
     void processTimesteppingParams();
     void initiateTimestepping();
     void finalizeRun();
@@ -73,8 +73,8 @@ private:
     unsigned getDomainPosition(const std::string domainID);
 
     // Inter-Domain Concurrency:
-    void setDomainConcurrency(unsigned nProc);
-    void check_nProc(unsigned &nProc);
+    void setDomainConcurrency(unsigned nProcTotal, unsigned nProcChild);
+    void check_nProc(unsigned &nProcTotal, unsigned &nProcChild);
     void check_multipleParents();
     std::vector<std::thread> threads;
 
@@ -115,11 +115,11 @@ Project<domainClass>::Project(ProjectInput &projectInput):
 
 // Performs the serial|parallel execution of a project:
 template <class domainClass>
-void Project<domainClass>::run(unsigned nProc){
+void Project<domainClass>::run(unsigned nProcTotal, unsigned nProcChild){
 
     // 1. Initialize:
     Report::log("Run is initializing:",1);
-    initializeRun(nProc);
+    initializeRun(nProcTotal, nProcChild);
 
     // 2. Timestepping:
     initiateTimestepping();
@@ -135,13 +135,13 @@ void Project<domainClass>::run(unsigned nProc){
 // includes configuring domain hierarchy and concurrency, instantiating grids, solvers,
 // outputs, reading inputs, etc. This function is called in Project<>::run()
 template <class domainClass>
-void Project<domainClass>::initializeRun(unsigned nProc){
+void Project<domainClass>::initializeRun(unsigned nProcTotal, unsigned nProcChild){
 
     // Construct the domain hierarchy:
     setDomainHierarchy();
 
     // Configure multithreaded domain concurrency:
-    setDomainConcurrency(nProc);
+    setDomainConcurrency(nProcTotal,nProcChild);
 
     // Lazy initialization of members such as solvers, grids, outputs, etc.
     Report::log("Setting up the simulation",2);
@@ -308,10 +308,10 @@ void Project<domainClass>::processDomainsList(ProjectInput &projectInput){
 
 // Configures inter-domain concurrency
 template <class domainClass>
-void Project<domainClass>::setDomainConcurrency(unsigned nProc){
+void Project<domainClass>::setDomainConcurrency(unsigned nProcTotal, unsigned nProcChild){
 
     // Check nProc and update if necessary
-    check_nProc(nProc);
+    check_nProc(nProcTotal, nProcChild);
 
     // Check if there are multiple parent domains
     check_multipleParents();
@@ -323,7 +323,7 @@ void Project<domainClass>::setDomainConcurrency(unsigned nProc){
         if (domain->isParent()){
 
             // Configure parent domain concurrency settings:
-            domain->setConcurrency(nProc);
+            domain->setConcurrency(nProcTotal, nProcChild);
 
             // Configure child domains' concurrency settings:
             for (auto &childWP: domain->childDomains){
@@ -381,17 +381,32 @@ unsigned Project<domainClass>::getDomainPosition(const std::string domainID){
 // Checks if nProc is greater than the number of threads available.
 // If so, sets it to (available threads)-1.
 template <class domainClass>
-void Project<domainClass>::check_nProc(unsigned &nProc){
+void Project<domainClass>::check_nProc(unsigned &nProcTotal, unsigned &nProcChild){
 
-    if (nProc>std::thread::hardware_concurrency()){
+    if (nProcTotal>std::thread::hardware_concurrency()){
         Report::warning("Concurrency!","Number of processors specified in CL ="
-                        +std::to_string(nProc)+" is greater than the number of available"
+                        +std::to_string(nProcTotal)+" is greater than the number of available"
                         " threads ="+std::to_string(std::thread::hardware_concurrency())
                         +"\n\t Setting number of processors to "
                         +std::to_string(std::thread::hardware_concurrency()-1),1);
-        nProc = std::thread::hardware_concurrency()-1;
+        nProcTotal = std::thread::hardware_concurrency()-1;
     }
 
+    if (nProcChild>=nProcTotal){
+        Report::warning("Concurrency!","Number of processors allocated for children must be "
+                        "less than the number of total processors ="
+                        +std::to_string(nProcTotal)
+                        +"\n\t Setting number of processors for children to "
+                        +std::to_string(nProcTotal-1),1);
+        nProcChild = nProcTotal-1;
+    }
+
+    if (domains.size()==0 and nProcChild>0){
+        Report::warning("Concurrency!","Number of processors allocated for children is greater than "
+                        "zero but there are not any child domains."
+                        "\n\t Setting number of processors for children to zero.");
+        nProcChild = 0;
+    }
 }
 
 

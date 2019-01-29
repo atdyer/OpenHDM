@@ -100,7 +100,7 @@ protected:
     virtual bool setParent(std::shared_ptr<Domain> parent);
 
     // Inter-Domain Parallelism:
-    void setConcurrency(unsigned nProcTotal=0);
+    void setConcurrency(unsigned nProcTotal=0, unsigned nProcChild=0);
     void insertPhase(std::function<void(unsigned)> phase);
     void phaseCheck();
     void completePhase();
@@ -287,7 +287,7 @@ bool Domain<SolverType>::setParent(std::shared_ptr<Domain<SolverType>> pd){
 // Configures domain concurrency constructs, e.g., mutexes and condition variables
 // of provides child domains with pointers to these constructs.
 template <class SolverType>
-void Domain<SolverType>::setConcurrency(unsigned nProcTotal){
+void Domain<SolverType>::setConcurrency(unsigned nProcTotal, unsigned nProcChild){
 
     if (not hierarchyIsSet()){
         Report::error("Domain Concurrency Configuration",
@@ -303,6 +303,11 @@ void Domain<SolverType>::setConcurrency(unsigned nProcTotal){
         else{
             // Dedicate ~50% of procs to inter-domain concurrency:
             unsigned nProc_interDomain = std::max(unsigned(1),unsigned(nProcTotal/2.));
+
+            // If a custom nProcChild is provided by the user, update nProc_interDomain:
+            if (nProcChild>0){
+                nProc_interDomain = nProcChild+1;
+            }
 
             // Dedicate remaining procs to parent domain:
             nProc_intraDomain = std::max(unsigned(1), nProcTotal-nProc_interDomain+1);
